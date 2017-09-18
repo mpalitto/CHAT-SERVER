@@ -10,7 +10,7 @@ case $1 in
 	;;
 
 	'create')
-	docker run -td --name $APPname -h $APPname -p 3000:3000 -v $APPdir:/root/$APPname -w /root/$APPname nodejs-image /bin/bash -c "$GITconfig; mv /root/package.json /root/$APPname/; mv /root/server.js /root/$APPname/; cd /root/$APPname; npm install package.json --save-dev; node server; while true; do sleep 99; done"
+	docker run -td --name $APPname -h $APPname -p 3000:3000 -v $APPdir:/root/$APPname -w /root/$APPname nodejs-image /bin/bash -c "$GITconfig; mv /root/package.json /root/$APPname/; mv /root/server.js /root/$APPname/; cd /root/$APPname;npm install sqlite3; npm install package.json --save-dev; while true; do sleep 99; done"
 	;;
 
 	'enter')
