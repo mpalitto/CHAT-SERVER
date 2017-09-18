@@ -3,7 +3,6 @@ var app = express();
 var server = require('http').createServer(app);
 var io = require('socket.io').listen(server);
 
-let sql = 'CREATE TABLE IF NOT EXISTS INVITATIONS ( userID TEXT PRIMARY KEY NOT NULL, invites TEXT NOT NULL)';
 const sqlite3 = require('sqlite3').verbose();
 let invitationsDB = new sqlite3.Database('./db/invitations.db', (err) => {
   if (err) {
@@ -11,6 +10,9 @@ let invitationsDB = new sqlite3.Database('./db/invitations.db', (err) => {
   }
   console.log('Connected to the INVITATIOS SQlite database.');
 });
+
+// create INVITATIONS table
+let sql = 'CREATE TABLE IF NOT EXISTS INVITATIONS ( userID TEXT PRIMARY KEY NOT NULL, invites TEXT NOT NULL)';
 invitationsDB.serialize(function() {
   invitationsDB.run(sql, [], function(err) {
     if (err) {
@@ -19,6 +21,8 @@ invitationsDB.serialize(function() {
       return;
     }
     console.log('INVITATION DB created successfully!');
+
+    //for testing only add a default invitation into the table
     sql = 'INSERT OR IGNORE INTO INVITATIONS (userID, invites) VALUES ("mpalitto@gmail.com", "{wife@gmail.com, FAMILY-BUDGET}")';
     invitationsDB.run(sql, [], function(err) {
       if (err) {
@@ -28,24 +32,7 @@ invitationsDB.serialize(function() {
       }
       console.log('first INVITATION ADDED successfully');
     });
-    sql = 'UPDATE INVITATIONS SET invites = invites || ", {son@gmail.com, FAMILY-BUDGET}" WHERE invites NOT LIKE "%{son@gmail.com, FAMILY-BUDGET%"';
-    invitationsDB.run(sql, [], function(err) {
-      if (err) {
-        console.log('Error executing statement:', err, err.stack);
-        //callback(err);
-        return;
-      }
-      console.log('new INVITATION ADDED successfully');
-    });
-    sql = 'SELECT * FROM INVITATIONS ORDER BY userID';
-    invitationsDB.each(sql, [], function(err, row) {
-      if (err) {
-        console.log('Error executing statement:', err, err.stack);
-        //callback(err);
-        return;
-      }
-      console.log(`${row.userID} - ${row.invites}`);
-    });
+
   });
 });
 
@@ -74,7 +61,52 @@ io.on('connection', function(socket){
     //check for invitations
   });
 
-  //check request if there are any invites for client
+  // new invite for user
+  socket.on('invite', function(invite){
+    console.log('new invite received FOR: '+invite.FOR+' FROM: '+ invite.FROM);
+    // sql = "INSERT OR IGNORE INTO INVITATIONS (userID, invites) VALUES (?, '{' || ? || ', ' || ? || '}')";
+    // invitationsDB.run(sql, [invite.FOR, invite.FROM, invite.GROUP], function(err) {
+    //   if (err) {
+    //     console.log('Error executing statement:', err, err.stack);
+    //     //callback(err);
+    //     return;
+    //   }
+    //   console.log('new INVITATION ADDED successfully');
+    // });
+    sql = "INSERT OR IGNORE INTO INVITATIONS (userID, invites) VALUES ($for, '{' || $from || ', ' || $group || '}')";
+    invitationsDB.run(sql, {$for: invite.FOR, $from: invite.FROM, $group: invite.GROUP}, function(err) {
+      if (err) {
+        console.log('Error executing statement:', err, err.stack);
+        //callback(err);
+        return;
+      }
+      console.log('new INVITATION ADDED successfully');
+    });
+
+    sql = "UPDATE INVITATIONS SET invites = invites || ', {' || $from || ', ' || $group || '}' WHERE userID = $for AND invites NOT LIKE '%{' || $from || ', ' || $group || '}%'";
+    // //sql = 'UPDATE INVITATIONS SET invites = invites || ?, WHERE invites NOT LIKE "%?%"';
+    invitationsDB.run(sql, {$for: invite.FOR, $from: invite.FROM, $group: invite.GROUP}, function(err) {
+      if (err) {
+        console.log('Error executing statement:', err, err.stack);
+        //callback(err);
+        return;
+      }
+      console.log('INVITATIONs UPDATED successfully');
+    });
+
+    //print on terminal list of invites
+    sql = 'SELECT * FROM INVITATIONS ORDER BY userID';
+    invitationsDB.each(sql, [], function(err, row) {
+      if (err) {
+        console.log('Error executing statement:', err, err.stack);
+        //callback(err);
+        return;
+      }
+      console.log(`--> ${row.userID} - ${row.invites}`);
+    });
+  });
+
+  // are there any invites for client
   socket.on('anyInvites', function(user){
     console.log('new invites check request from: '+user.userID);
     sql = `SELECT userID userID,
